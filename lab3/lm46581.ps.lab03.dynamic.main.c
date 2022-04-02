@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <dlfcn.h>
 
-void print_groups(char *ut_user, gid_t pw_gid);
+void (*print_groups)(char *, gid_t);
 
 int main(int argc, char *argv[])
 {
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    void *handle = dlopen("./libtest.so.0.1", RTLD_LAZY);
+    void *handle = dlopen("./libtest.so", RTLD_LAZY);
     if (!handle)
     {
         printf("No function named print_groups found.\n");
@@ -50,7 +50,6 @@ int main(int argc, char *argv[])
     {
         if (entry->ut_type == USER_PROCESS)
         {
-
             if ((p = getpwnam(entry->ut_user)) == NULL)
             {
                 perror("error while retrieving passwd structure");
@@ -58,13 +57,15 @@ int main(int argc, char *argv[])
             }
 
             printf("%s ", entry->ut_user);
-            
+
             if (host_flag)
                 printf("%s ", entry->ut_host);
             if (groups_flag)
+            {
                 print_groups = dlsym(handle, "print_groups");
                 print_groups(entry->ut_user, p->pw_gid);
                 dlclose(handle);
+            }
 
             printf("\n");
         }

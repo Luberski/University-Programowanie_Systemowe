@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <grp.h>
 #include <stdbool.h>
-#include "lib.c"
 
 void print_groups(char *ut_user, gid_t pw_gid);
 
