@@ -9,6 +9,7 @@
 #include <grp.h>
 #include <stdbool.h>
 #include <dlfcn.h>
+#include <unistd.h>
 
 void (*print_groups)(char *, gid_t);
 
@@ -31,7 +32,7 @@ int main(int argc, char *argv[])
             groups_flag = true;
             break;
         default:
-            fprintf(stderr, "Usage: %s [-t nsecs] [-n] name\n",
+            fprintf(stderr, "Usage: %s [-h] [-g]\n",
                     argv[0]);
             exit(EXIT_FAILURE);
         }

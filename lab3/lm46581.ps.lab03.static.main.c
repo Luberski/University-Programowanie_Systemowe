@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <grp.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 void print_groups(char *ut_user, gid_t pw_gid);
 
@@ -30,7 +31,7 @@ int main(int argc, char *argv[])
             groups_flag = true;
             break;
         default:
-            fprintf(stderr, "Usage: %s [-t nsecs] [-n] name\n",
+            fprintf(stderr, "Usage: %s [-h] [-g]\n",
                     argv[0]);
             exit(EXIT_FAILURE);
         }
