@@ -25,9 +25,6 @@ int main(int argc, char *argv[])
     double real_total = 0;
     double user_total = 0;
     double system_total = 0;
-    struct timespec start, end;
-    struct rusage usage;
-    clock_gettime(CLOCK_REALTIME, &start);
 
     while ((opt = getopt(argc, argv, "vt:")) != -1)
     {
@@ -60,7 +57,9 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < times_executed; i++) {
         pid_t pid = fork();
-      
+        struct timespec start, end;
+        struct rusage usage;
+        clock_gettime(CLOCK_REALTIME, &start);
 
         if(pid == 0) {
             if(program_output_visible) {
@@ -94,10 +93,10 @@ int main(int argc, char *argv[])
     }
 
     if (times_executed > 1) {
-        printf("\nTotal execution time:\n");
-        printf("real: %f\n", real_total);
-        printf("user: %f\n", user_total);
-        printf("system: %f\n", system_total);
+        printf("\nMedian\n");
+        printf("real: %f\n", real_total/times_executed);
+        printf("user: %f\n", user_total/times_executed);
+        printf("system: %f\n", system_total/times_executed);
     }
 
 }

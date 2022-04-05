@@ -45,6 +45,8 @@ int main(int argc, char *argv[])
         host_flag = false;
         groups_flag = false;
     }
+    if(groups_flag) print_groups = dlsym(handle, "print_groups");
+    
 
     setutent();
     while (entry = getutent())
@@ -63,12 +65,14 @@ int main(int argc, char *argv[])
                 printf("%s ", entry->ut_host);
             if (groups_flag)
             {
-                print_groups = dlsym(handle, "print_groups");
                 print_groups(entry->ut_user, p->pw_gid);
-                dlclose(handle);
             }
 
             printf("\n");
         }
+    }
+    if (groups_flag)
+    {
+        dlclose(handle);
     }
 }

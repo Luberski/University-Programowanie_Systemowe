@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <grp.h>
+#include <unistd.h>
 
 void print_groups(char *ut_user, gid_t pw_gid)
 {
