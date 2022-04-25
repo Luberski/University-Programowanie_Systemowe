@@ -10,22 +10,34 @@
 #include <time.h>
 #include <errno.h>
 
-int main(int argc, char *argv[])) {
-    int max_lifetime = 5;
-    int interval = 5;
+int main(int argc, char *argv[]) {
+    srand(time(NULL));
+    int max_lifetime = 0;
+    int interval = 0;
+    int opt;
 
-    if(argc == 3 ) {
-        max_lifetime = atoi(argv[1]);
-        interval = atoi(argv[2]);
-    }
-    else {
-        fprintf(stderr, "Usage: %s [process_lifetime] [process_creation_interval]\n",
+    while ((opt = getopt(argc, argv, "m:w:")) != -1)
+    {
+        switch (opt)
+        {
+        case 'm':
+            max_lifetime = atoi(optarg);
+            break;
+        case 'w':
+            interval = atoi(optarg);
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-m] [-w]\n",
                     argv[0]);
-        exit(EXIT_FAILURE);
+            exit(EXIT_FAILURE);
+        }
     }
 
-
-
+    printf("max_lifetime: %d, interval: %d\n", max_lifetime, interval);
+    
+    // Print random value from 1 to max lifetime
+    int random_value = (rand() % (max_lifetime - 1 + 1)) + 1;
+    printf("random_value: %d\n", random_value);
 
     struct sigaction act;
     act.sa_handler = SIG_IGN;
