@@ -1,3 +1,7 @@
+// PS IS1 323 LAB06
+// Mariusz Lubowicki
+// lm46581@zut.edu.pl
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -7,7 +11,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <pthread.h>
-#include "timer.h"
+#include "lm46581.ps.lab06.timer.h"
 
 void sig_handler(int sig, siginfo_t *info, void *d)
 {
