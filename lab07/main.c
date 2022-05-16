@@ -11,14 +11,16 @@
 #include <sys/time.h>
 #include <time.h>
 
+// $6$5MfvmFOaDU$3Sn0LwzVT/dmzejrxvnDjGEX0W03YucvvDDBvX7QEACWUnwLA7MLjyOHHygMLzDhxwqYLYlry.73KOK9MMkKA1
 pthread_mutex_t lock;
 char *buff;
-char *main_hash = "$6$5MfvmFOaDU$aHjkUSr6crP19Jm.XvMvBHL6M1w78TzR8NmxcFuhZ8DkrK/uHbJm1lc9atTl2at0j5gnOzS4MCcnOtWXa2Eoi1";
+char *main_hash = "$6$5MfvmFOaDU$3Sn0LwzVT/dmzejrxvnDjGEX0W03YucvvDDBvX7QEACWUnwLA7MLjyOHHygMLzDhxwqYLYlry.73KOK9MMkKA1";
 struct stat sb;
 int stop_flag = 0;
 float last_progress = 0;
 long int progress = 0;
 int speed_test_flag = 0;
+int word_count = 0;
 
 struct Passw {
     int start;
@@ -37,12 +39,10 @@ void compare_hash(char* string) {
     }
 
     if (strcmp(hash, main_hash) == 0) {
-        printf("\033[2J");
+        // printf("\033[2J");
         printf("%s\n", string);
         stop_flag = 1;
     }
-
-    free(hash);
 }
 
 void set_offsets(struct Passw *offsets, int threads) {
@@ -69,24 +69,24 @@ void set_offsets(struct Passw *offsets, int threads) {
 void* thread_speed_test(void *offsets) {
     struct Passw *offset = (struct Passw *) offsets;
     int word_start = 0;
+    int word_count = 0;
     for (int i = offset->start; i <= offset->end; i++) {
         if (buff[i] == '\n' ) {
             char* password = malloc(50 * sizeof(char));
             memcpy(password, buff+i-word_start, word_start);
             struct crypt_data data;
             data.initialized = 0;
-            char *hash = crypt_r(string, "$6$5MfvmFOaDU$encrypted", &data);
+            char *hash = crypt_r(password, "$6$5MfvmFOaDU$encrypted", &data);
             password[word_start] = '\0';
             word_start = 0;
+            word_count++;
             free(password);
-            free(hash);
         }
         else
             word_start = word_start+1;
-        
     }
     
-
+    printf("Thread %ld: %d passwords searched\n", pthread_self(), word_count);
 }
 
 void* thread_func(void *offsets)
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     int index = argc == 1 ? 0 : atoi(argv[1]);
     char *dict;
     char *salt = "$6$5MfvmFOaDU$encrypted";
-    int *threads_num = -500;
+    int threads_num = -500;
     int opt;
 
     if (pthread_mutex_init(&lock, NULL) != 0)
@@ -131,13 +131,21 @@ int main(int argc, char *argv[])
     }
 
 
+    // struct crypt_data data;
+    // data.initialized = 0;
 
     while ((opt = getopt(argc, argv, "h:d:t:")) != -1)
     {
         switch (opt)
         {
         case 'h':
-            main_hash = optarg;
+            
+            // main_hash = malloc(strlen(optarg) * sizeof(char));
+            // main_hash = optarg;
+            // printf("decode: $6$5MfvmFOaDU$3Sn0LwzVT/dmzejrxvnDjGEX0W03YucvvDDBvX7QEACWUnwLA7MLjyOHHygMLzDhxwqYLYlry.73KOK9MMkKA1\n");
+            // printf("optarg: %s\n", main_hash);
+            // char *hash = crypt_r("aaron1972", "$6$5MfvmFOaDU$encrypted", &data);
+            // printf("%s\n", hash);
             break;
         case 'd':
             dict = optarg;
@@ -152,11 +160,10 @@ int main(int argc, char *argv[])
         }
     }
 
-
+    // printf("Threads: %ld\n", sysconf(_SC_NPROCESSORS_ONLN));
 
 
     if(threads_num == -500) {
-        printf("Speed test enabled\n")
         speed_test_flag = 1;
     }
     else if (threads_num > sysconf(_SC_NPROCESSORS_ONLN) || threads_num < 1)
@@ -180,23 +187,25 @@ int main(int argc, char *argv[])
 
 
     if(speed_test_flag) {
-        for(int i = 2; i <= sysconf(_SC_NPROCESSORS_ONLN)-1; i++) {
+        for(int i = 2; i <= sysconf(_SC_NPROCESSORS_ONLN); i++) {
             pthread_t threads[i];
             struct Passw offsets[i];
+            sb.st_size = 10000;
             set_offsets(offsets, i);
 
             printf("Measuring time for %d threads\n", i);
             struct timespec start, end;
             clock_gettime(CLOCK_MONOTONIC, &start);
+
             for (int j = 0; j < i; j++) {
-                pthread_create(&threads[i], NULL, thread_speed_test, (void *) &offsets[i]);
+                pthread_create(&threads[j], NULL, thread_speed_test, (void *) &offsets[j]);
             }
             for (int j = 0; j < i; j++) {
-                pthread_join(threads[i], NULL);
+                pthread_join(threads[j], NULL);
             }
             clock_gettime(CLOCK_MONOTONIC, &end);
             double time_spent = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000000000.0;
-            printf("Time spent: %f\n", time_spent);
+            printf("Time spent: %f s\n\n", time_spent);
         }
         
 
@@ -207,17 +216,17 @@ int main(int argc, char *argv[])
     struct Passw *offsets = calloc(threads_num, sizeof(*offsets));
     set_offsets(offsets, threads_num);
 
-    // Print offsets
-    for (int i = 0; i < threads_num; i++) {
-        printf("Thread %d: start: %d, end: %d\n", i, offsets[i].start, offsets[i].end);
-    }
+    // print offsets
+    // for (int i = 0; i < threads_num; i++) {
+    //     printf("%d: %d - %d\n", i, offsets[i].start, offsets[i].end);
+    // }
 
 
 
     pthread_t *threads = malloc(threads_num * sizeof(pthread_t));
     for (int i = 0; i < threads_num; i++)
     {
-        pthread_create(&threads[i], NULL, &thread_func, &offsets[i]);
+        pthread_create(&threads[i], NULL, thread_func, &offsets[i]);
     }
 
     printf("\033[2J");
