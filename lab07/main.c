@@ -7,59 +7,93 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <math.h>
 
 pthread_mutex_t lock;
 char *buff;
-long int index = 0;
+char *main_hash = "$6$5MfvmFOaDU$HomO0zZicouzaF3OL1JaX5kul2GnSORy3IipMCySPhff6zwU6QuMOjXIPC8IvzSp0uGpiznpMnePkIjqWATs60";
 struct stat sb;
+int stop_flag = 0;
+float last_progress = 0;
+long int progress = 0;
 
-long int assign_password()
-{
-    long int next_index = 0;
-    pthread_mutex_lock(&lock);
-    if(index == st.st_size)
-    {
-        return -1;
+struct Passw {
+    int start;
+    int end;
+};
+
+void compare_hash(char* string) {
+    struct crypt_data data;
+    data.initialized = 0;
+
+    char *hash = crypt_r(string, "$6$5MfvmFOaDU$encrypted", &data);
+    if(last_progress+0.1 < ((float)(progress*100) / (float)sb.st_size)) {
+        printf("\033[2J");
+        printf("Progress: %0.1f%%\n", ((float)(progress*100) / (float)sb.st_size));
+        printf("Progress: %ld / %ld\n", progress, sb.st_size);
+        last_progress = ((float)(progress*100) / (float)sb.st_size);
     }
-    while(index != '\n' || index < st.st_size)
-    {
-        index++;
+
+    if (strcmp(hash, main_hash) == 0) {
+        printf("%s\n", string);
+        stop_flag = 1;
     }
-    next_index = index;
-    pthread_mutex_unlock(&lock);
 
-    
-
-    return next_index;
 }
 
-void thread_func(void *arg)
-{
-    index = 0;
+void set_offsets(struct Passw *offsets, int threads) {
+    int filesize = sb.st_size;
+    int chunk = filesize / threads;
+    int offset = 0;
+    int i;
 
-    while(index = assign_password())
-    {
-        index_end = index+1;
-        while(index_end != '\n')
-        {
-            index_end++;
-        }
+    for (i = 0; i < threads; i++) {
+        offsets[i].start = offset;
+        offsets[i].end = (i + 1) * chunk;
+        offset = ((i + 1) * chunk) + 1;
+    }
+    offsets[threads - 1].end = filesize;
 
-        char* pass = malloc(index_end-index);
-        for (int i = index; i < index_end; i++)
-        {
-            buff[i] = '\0';
+    for (i = 0; i < threads-1; i++) {
+        while(buff[offsets[i].end] != '\n') {
+            offsets[i].end++;
+            offsets[i+1].start++;
         }
     }
+}
+
+void* thread_func(void *offsets)
+{
+    struct Passw *offset = (struct Passw *) offsets;
+    int word_start = 0;
+    for (int i = offset->start; i <= offset->end; i++) {
+        if (buff[i] == '\n' ) {
+            char* password = malloc(50 * sizeof(char));
+            memcpy(password, buff+i-word_start, word_start);
+            compare_hash(password);
+            password[word_start] = '\0';
+            word_start = 0;
+            free(password);
+        }
+        else
+            word_start = word_start+1;
+
+        if (stop_flag) pthread_exit(NULL);
+
+        pthread_mutex_lock(&lock);
+        progress++;
+        pthread_mutex_unlock(&lock);
+    }
+
+    
 }
 
 int main(int argc, char *argv[])
 {
     int index = argc == 1 ? 0 : atoi(argv[1]);
-    char *hash;
     char *dict;
     char *salt = "$6$5MfvmFOaDU$encrypted";
-    int threads_num = 1;
+    int threads_num = 0;
     int opt;
 
     if (pthread_mutex_init(&lock, NULL) != 0)
@@ -68,12 +102,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+
+
     while ((opt = getopt(argc, argv, "h:d:t:")) != -1)
     {
         switch (opt)
         {
         case 'h':
-            hash = optarg;
+            main_hash = optarg;
             break;
         case 'd':
             dict = optarg;
@@ -87,6 +123,11 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
     }
+
+
+
+
+
 
     if (threads_num > sysconf(_SC_NPROCESSORS_ONLN) || threads_num < 1)
     {
@@ -107,22 +148,41 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // pthread_t *threads = malloc(threads_num * sizeof(pthread_t));
-    // for (int i = 0; i < threads; i++)
-    // {
-    //     pthread_create(&threads[i], NULL, thread_func, NULL);
-    // }
 
-    // for (int i = 0; i < threads; i++)
-    // {
-    //     pthread_join(threads[i], NULL);
-    // }
+
+
+
+    struct Passw *offsets = calloc(threads_num, sizeof(*offsets));
+    set_offsets(offsets, threads_num);
+
+    // Print offsets
+    for (int i = 0; i < threads_num; i++) {
+        printf("Thread %d: start: %d, end: %d\n", i, offsets[i].start, offsets[i].end);
+    }
+
+
+
+    pthread_t *threads = malloc(threads_num * sizeof(pthread_t));
+    for (int i = 0; i < threads_num; i++)
+    {
+        pthread_create(&threads[i], NULL, &thread_func, &offsets[i]);
+    }
+
+    printf("\033[2J");
+    printf("Progress: 0.0%%\n");
+
+    for (int i = 0; i < threads_num; i++)
+    {
+        pthread_join(threads[i], NULL);
+    }
 
     if (munmap(buff, sb.st_size) != 0)
     {
         fprintf(stderr, "UnMapping Failed\n");
         return 1;
     }
+
+    free(offsets);
 
     return 0;
 }
