@@ -1,8 +1,3 @@
-// PS IS1 322 LAB08
-// Sebastian Byczyk
-// bs46482@zut.edu.pl
-
-
 #define _GNU_SOURCE
 #include <crypt.h>
 #include <unistd.h>
