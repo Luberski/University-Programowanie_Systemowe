@@ -1,3 +1,8 @@
+// PS IS1 323 LAB07
+// Mariusz Lubowicki
+// lm46581@zut.edu.pl
+
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,10 +16,9 @@
 #include <sys/time.h>
 #include <time.h>
 
-// $6$5MfvmFOaDU$3Sn0LwzVT/dmzejrxvnDjGEX0W03YucvvDDBvX7QEACWUnwLA7MLjyOHHygMLzDhxwqYLYlry.73KOK9MMkKA1
 pthread_mutex_t lock;
 char *buff;
-char *main_hash = "$6$5MfvmFOaDU$3Sn0LwzVT/dmzejrxvnDjGEX0W03YucvvDDBvX7QEACWUnwLA7MLjyOHHygMLzDhxwqYLYlry.73KOK9MMkKA1";
+char *main_hash;
 struct stat sb;
 int stop_flag = 0;
 float last_progress = 0;
@@ -39,8 +43,7 @@ void compare_hash(char* string) {
     }
 
     if (strcmp(hash, main_hash) == 0) {
-        // printf("\033[2J");
-        printf("%s\n", string);
+        printf("Answer found: %s\n", string);
         stop_flag = 1;
     }
 }
@@ -97,11 +100,13 @@ void* thread_func(void *offsets)
         if (buff[i] == '\n' ) {
             char* password = malloc(50 * sizeof(char));
             memcpy(password, buff+i-word_start, word_start);
+            password[word_start] = '\0';
             compare_hash(password);
+
             pthread_mutex_lock(&lock);
             progress+=word_start+1;
             pthread_mutex_unlock(&lock);
-            password[word_start] = '\0';
+
             word_start = 0;
             free(password);
         }
@@ -130,22 +135,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-
-    // struct crypt_data data;
-    // data.initialized = 0;
-
     while ((opt = getopt(argc, argv, "h:d:t:")) != -1)
     {
         switch (opt)
         {
         case 'h':
-            
-            // main_hash = malloc(strlen(optarg) * sizeof(char));
-            // main_hash = optarg;
-            // printf("decode: $6$5MfvmFOaDU$3Sn0LwzVT/dmzejrxvnDjGEX0W03YucvvDDBvX7QEACWUnwLA7MLjyOHHygMLzDhxwqYLYlry.73KOK9MMkKA1\n");
-            // printf("optarg: %s\n", main_hash);
-            // char *hash = crypt_r("aaron1972", "$6$5MfvmFOaDU$encrypted", &data);
-            // printf("%s\n", hash);
+            main_hash = optarg;
             break;
         case 'd':
             dict = optarg;
@@ -159,8 +154,6 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
     }
-
-    // printf("Threads: %ld\n", sysconf(_SC_NPROCESSORS_ONLN));
 
 
     if(threads_num == -500) {
@@ -215,11 +208,6 @@ int main(int argc, char *argv[])
 
     struct Passw *offsets = calloc(threads_num, sizeof(*offsets));
     set_offsets(offsets, threads_num);
-
-    // print offsets
-    // for (int i = 0; i < threads_num; i++) {
-    //     printf("%d: %d - %d\n", i, offsets[i].start, offsets[i].end);
-    // }
 
 
 
