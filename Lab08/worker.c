@@ -73,7 +73,7 @@ typedef struct msgbuf {
 	int results;
 	int pass;
 	int start;
-	int stop;
+	int end;
 	char hash[256];
 	char salt[16];
 } message_buf;

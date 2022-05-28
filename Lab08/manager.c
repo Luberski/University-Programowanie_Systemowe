@@ -13,43 +13,76 @@
 #include <fcntl.h>
 #include <math.h>
 #include <signal.h>
+#include <time.h>
+#include <sys/time.h>
 
-int words = 20577922;
-char* main_hash;
-char* salt;
+char *main_hash;
+struct stat sb;
+char *salt;
+char *buff;
 
-typedef struct msgbuf {
+typedef struct msgbuf
+{
 	long mtype;
 	int id;
 	int data;
 	int results;
 	int pass;
 	int start;
-	int stop;
+	int end;
 	char hash[256];
 	char salt[16];
 } message_buf;
 
+void set_offsets(struct Passw *offsets, int threads)
+{
+	int filesize = sb.st_size;
+	int chunk = filesize / threads;
+	int offset = 0;
+	int i;
 
-void extractor(char* hash) {
+	for (i = 0; i < threads; i++)
+	{
+		offsets[i].start = offset;
+		offsets[i].end = (i + 1) * chunk;
+		offset = ((i + 1) * chunk) + 1;
+	}
+	offsets[threads - 1].end = filesize;
+
+	for (i = 0; i < threads - 1; i++)
+	{
+		while (buff[offsets[i].end] != '\n')
+		{
+			offsets[i].end++;
+			offsets[i + 1].start++;
+		}
+	}
+}
+
+void extractor(char *hash)
+{
 	int $sign = 0;
-	char* tmp_salt = malloc(16 * sizeof(char));
-	char* tmp_hash = malloc(256 * sizeof(char));
+	char *tmp_salt = malloc(16 * sizeof(char));
+	char *tmp_hash = malloc(256 * sizeof(char));
 	int i = 0;
 	int j = 0;
-	while(hash[i] != '\0') {
-		if($sign < 3) {
-			if(hash[i] == '$') {
+	while (hash[i] != '\0')
+	{
+		if ($sign < 3)
+		{
+			if (hash[i] == '$')
+			{
 				$sign += 1;
 			}
-			
+
 			tmp_salt[i] = hash[i];
 		}
-		else {
+		else
+		{
 			i += 1;
 			break;
 		}
-		
+
 		i += 1;
 	}
 
@@ -68,135 +101,115 @@ void extractor(char* hash) {
 int main(int argc, char **argv)
 {
 	int filesize = sb.st_size;
-    int chunk = filesize / threads;
+	int chunk = filesize / threads;
 	int work_count = 0;
-	char* dict;
+	char *dict;
 	int opt;
 	printf("\n");
 
 	while ((opt = getopt(argc, argv, "h:d:t:")) != -1)
-    {
-        switch (opt)
-        {
-        case 'h':
-            extractor(optarg);
-            break;
-        case 'd':
-            dict = optarg;
-            break;
-        case 't':
-            work_count = atoi(optarg);
-            break;
-        default:
-            fprintf(stderr, "Usage: %s [-h] [-d] [-t]\n",
-                    argv[0]);
-            exit(EXIT_FAILURE);
-        }
-    }
+	{
+		switch (opt)
+		{
+		case 'h':
+			extractor(optarg);
+			break;
+		case 'd':
+			dict = optarg;
+			break;
+		case 't':
+			work_count = atoi(optarg);
+			break;
+		default:
+			fprintf(stderr, "Usage: %s [-h] [-d] [-t]\n",
+					argv[0]);
+			exit(EXIT_FAILURE);
+		}
+	}
 
-// // read dictionary file
-// 	const char *filepath = dvalue;
-//     int fd = open(filepath, O_RDONLY, (mode_t)0600);
-//     if (fd == -1)
-//     {
-//         perror("Error opening file for writing");
-//         exit(EXIT_FAILURE);
-//     }        
-//     struct stat fileInfo = {0}; 
-//     if (fstat(fd, &fileInfo) == -1)
-//     {
-//         perror("Error getting the file size");
-//         exit(EXIT_FAILURE);
-//     }   
-//     if (fileInfo.st_size == 0)
-//     {
-//         fprintf(stderr, "Error: File is empty, nothing to do\n");
-//         exit(EXIT_FAILURE);
-//     }
+	int fd = open(dict, O_RDONLY);
+	fstat(fd, &sb);
+	if (fd == -1)
+	{
+		fprintf(stderr, "Error opening file\n");
+		return 1;
+	}
+	if ((buff = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0)) == NULL)
+	{
+		fprintf(stderr, "Error mapping file\n");
+		return 1;
+	}
 
-// // map dictionary file     
-//     char* map = mmap(0, fileInfo.st_size, PROT_READ, MAP_SHARED, fd, 0);
-//     if (map == MAP_FAILED)
-//     {
-//         close(fd);
-//         perror("Error mmapping the file");
-//         exit(EXIT_FAILURE);
-//     }
-   
+	// shared memory
 
-// //shared memory
+	int dshid = shmget(0, sb.st_size, 0600 | IPC_CREAT);
+	char *data = shmat(dshid, NULL, 0);
+	memcpy(data, buff, sb.st_size);
 
-// 	int dshid = shmget(0, fileInfo.st_size, 0600 | IPC_CREAT);
-// 	char* data = shmat(dshid, NULL, 0);
-// 	memcpy(data,map,fileInfo.st_size);
+	int rshid = shmget(1, work_count + 2, 0600 | IPC_CREAT);
+	int *results = shmat(rshid, NULL, 0);
+	int *res = malloc(16 * sizeof(int));
+	res[0] = 1;
+	memcpy(results, res, 16);
 
-// 	int rshid = shmget(1, tvalue+2, 0600 | IPC_CREAT);
-// 	int* results = shmat(rshid, NULL, 0);
-// 	int* res = malloc(16 * sizeof(int));
-// 	res[0]=1;
-// 	memcpy(results,res,16);
+	int pshid = shmget(2, 16, 0600 | IPC_CREAT);
+	char *pass = shmat(pshid, NULL, 0);
+	char *pas = malloc(16 * sizeof(char));
+	memcpy(pass, pas, 16);
 
-// 	int pshid = shmget(2, 16, 0600 | IPC_CREAT);
-// 	char* pass = shmat(pshid, NULL, 0);
-// 	char* pas = malloc(16 * sizeof(char));
-// 	memcpy(pass,pas,16);
+	// //queue
 
-// //queue
+	// 	message_buf mbuf;
+	// 	size_t buf_length = sizeof(mbuf);
+	// 	int msqid = msgget(0, IPC_CREAT | 0666);
 
-// 	message_buf mbuf;
-// 	size_t buf_length = sizeof(mbuf);
-// 	int msqid = msgget(0, IPC_CREAT | 0666);
+	// 	printf("The task was divided into %d parts\nThe queue id is %d\n",work_count,msqid);
 
-// 	printf("The task was divided into %d parts\nThe queue id is %d\n",tvalue,msqid);	
+	// 	int chunk_size = sb.st_size/work_count;
 
-// 	int chunk_size = fileInfo.st_size/tvalue;
+	// 	for(int i=0; i<work_count; i++){
+	// 		mbuf.mtype = 1;
+	// 		mbuf.data = dshid;
+	// 		mbuf.results = rshid;
+	// 		mbuf.pass = pshid;
+	// 		mbuf.id = i;
+	// 		mbuf.start = i*chunk_size;
+	// 		mbuf.stop = (i+1)*chunk_size;
+	// 		memset(mbuf.hash,0,sizeof(mbuf.hash));
+	// 		strcpy(mbuf.hash, my_hash);
+	// 		memset(mbuf.salt,0,sizeof(mbuf.salt));
+	// 		strcpy(mbuf.salt, my_salt);
+	// 		printf("to send: %s %s\n",mbuf.salt,mbuf.hash);
+	// 		msgsnd(msqid, &mbuf, buf_length, IPC_NOWAIT);
+	// 	}
 
-// 	for(int i=0; i<tvalue; i++){
-// 		mbuf.mtype = 1;
-// 		mbuf.data = dshid;
-// 		mbuf.results = rshid;
-// 		mbuf.pass = pshid;
-// 		mbuf.id = i;
-// 		mbuf.start = i*chunk_size;
-// 		mbuf.stop = (i+1)*chunk_size;
-// 		memset(mbuf.hash,0,sizeof(mbuf.hash));
-// 		strcpy(mbuf.hash, my_hash);
-// 		memset(mbuf.salt,0,sizeof(mbuf.salt));
-// 		strcpy(mbuf.salt, my_salt);
-// 		printf("to send: %s %s\n",mbuf.salt,mbuf.hash);
-// 		msgsnd(msqid, &mbuf, buf_length, IPC_NOWAIT);
-// 	}
+	// //wait for result
+	// 	while(results[0] != 0)
+	// 	{
+	// 		int a=0;
+	// 	}
 
-// //wait for result
-// 	while(results[0] != 0)
-// 	{
-// 		int a=0;
-// 	}
+	// 	int total=0;
+	// 	for(int i=0;i<work_count;i++)
+	// 		total += results[i+1];
 
-// 	int total=0;
-// 	for(int i=0;i<tvalue;i++)
-// 		total += results[i+1];
+	// 	printf("The password was found: %s\n%d of %d (%d%%) entries from the dictionary were checked\n",pass,total,words,total*100/words);
 
-// 	printf("The password was found in the dictionary :)\nThe password is %s\n%d of %d (%d%%) entries from the dictionary were checked\n",pass,total,words,total*100/words);
+	if (munmap(buff, sb.st_size) != 0)
+	{
+		fprintf(stderr, "UnMapping Failed\n");
+		return 1;
+	}
+	fd.close();
 
-
-// // unmapping dictionary file and close it
-//     if (munmap(map, fileInfo.st_size) == -1)
-//     {
-//         close(fd);
-//         perror("Error un-mmapping the file");
-//         exit(EXIT_FAILURE);
-//     }
-//     close(fd);
-
-// //free shared memory
-// 	shmdt(data);
-// 	shmdt(results);
-// 	shmdt(pass);
-// 	msgctl(msqid, IPC_RMID, NULL);
-// 	shmctl(dshid, IPC_RMID, NULL);
-// 	shmctl(rshid, IPC_RMID, NULL);
-// 	shmctl(pshid, IPC_RMID, NULL);
+	// //free shared memory
+	// 	shmdt(data);
+	// 	shmdt(results);
+	// 	shmdt(pass);
+	// 	msgctl(msqid, IPC_RMID, NULL);
+	// 	shmctl(dshid, IPC_RMID, NULL);
+	// 	shmctl(rshid, IPC_RMID, NULL);
+	// 	shmctl(pshid, IPC_RMID, NULL);
 	free(main_hash);
 	free(salt);
 }
