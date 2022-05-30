@@ -34,6 +34,8 @@ typedef struct msgbuf
 	char salt[16];
 } message_buf;
 
+
+
 void set_offsets(struct Passw *offsets, int threads)
 {
 	int filesize = sb.st_size;
@@ -57,6 +59,16 @@ void set_offsets(struct Passw *offsets, int threads)
 			offsets[i + 1].start++;
 		}
 	}
+}
+
+static int mapping_block(char *filename, int file_size) {
+    key_t key = ftok(filename, 0);
+    if (key == -1) {
+        perror("ftok");
+        return -1;
+    }
+
+    return shmget(key, file_size, IPC_CREAT | 0600);
 }
 
 void extractor(char *hash)
@@ -140,22 +152,22 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// shared memory
+	// // shared memory
 
-	int dshid = shmget(0, sb.st_size, 0600 | IPC_CREAT);
-	char *data = shmat(dshid, NULL, 0);
-	memcpy(data, buff, sb.st_size);
+	// int dshid = shmget(0, sb.st_size, 0600 | IPC_CREAT);
+	// char *data = shmat(dshid, NULL, 0);
+	// memcpy(data, buff, sb.st_size);
 
-	int rshid = shmget(1, work_count + 2, 0600 | IPC_CREAT);
-	int *results = shmat(rshid, NULL, 0);
-	int *res = malloc(16 * sizeof(int));
-	res[0] = 1;
-	memcpy(results, res, 16);
+	// int rshid = shmget(1, work_count + 2, 0600 | IPC_CREAT);
+	// int *results = shmat(rshid, NULL, 0);
+	// int *res = malloc(16 * sizeof(int));
+	// res[0] = 1;
+	// memcpy(results, res, 16);
 
-	int pshid = shmget(2, 16, 0600 | IPC_CREAT);
-	char *pass = shmat(pshid, NULL, 0);
-	char *pas = malloc(16 * sizeof(char));
-	memcpy(pass, pas, 16);
+	// int pshid = shmget(2, 16, 0600 | IPC_CREAT);
+	// char *pass = shmat(pshid, NULL, 0);
+	// char *pas = malloc(16 * sizeof(char));
+	// memcpy(pass, pas, 16);
 
 	// //queue
 
@@ -210,6 +222,5 @@ int main(int argc, char **argv)
 	// 	shmctl(dshid, IPC_RMID, NULL);
 	// 	shmctl(rshid, IPC_RMID, NULL);
 	// 	shmctl(pshid, IPC_RMID, NULL);
-	free(main_hash);
-	free(salt);
+
 }
