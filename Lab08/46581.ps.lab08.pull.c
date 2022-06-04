@@ -1,3 +1,7 @@
+// PS IS1 323 LAB08
+// Mariusz Lubowicki
+// lm46581@zut.edu.pl
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>

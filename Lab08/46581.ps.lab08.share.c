@@ -1,3 +1,7 @@
+// PS IS1 323 LAB08
+// Mariusz Lubowicki
+// lm46581@zut.edu.pl
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -183,8 +187,10 @@ void extractor(char *hash)
 int main(int argc, char **argv)
 {
 	struct stat sb;
+	struct msqid_ds queue_data;
 	struct msqid_ds ds;
 	int work_count = 0;
+	int curr_msg;
 	int chunk = 0;
 	int opt;
 	struct sigaction act;
@@ -206,6 +212,7 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			work_count = atoi(optarg);
+			curr_msg = work_count;
 			chunk = FILESIZE / work_count;
 			break;
 		default:
@@ -314,6 +321,14 @@ int main(int argc, char **argv)
 
 	// wait for enter
 	while(1) {
+		msgctl(queue_id, IPC_STAT, &queue_data);
+
+		if(queue_data.msg_qnum < curr_msg) {
+			curr_msg = queue_data.msg_qnum;
+			printf("Pobrano wiadomosc\n");
+			printf("Ilość wiadomości w kolejce: %d\n", curr_msg);
+			printf("PID pobierającego: %d\n", queue_data.msg_lrpid);
+		}
 		if(info_shm_block->progress >= 20577920) {
 			printf("Searching completed with no result\n");
 			break;
