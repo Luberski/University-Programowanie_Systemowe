@@ -1,0 +1,4 @@
+10615 05/06/2022 23:54:19 219.56.205.96 GET ./server/index.html 200 OK
+10616 05/06/2022 23:54:20 219.56.205.96 GET ./server/images/image1.jpg 200 OK
+10675 05/06/2022 23:55:19 219.56.205.96 GET ./server/index.html 200 OK
+10679 05/06/2022 23:55:19 219.56.205.96 GET ./server/index.html 200 OK
