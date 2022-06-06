@@ -42,7 +42,6 @@ static int check_pid_file(const char *fname)
 
     if (fp != NULL)
     {
-        /* File exists, read its contents. */
         if (fscanf(fp, " %d", &pid) != 1)
         {
             pid = 0;
@@ -52,7 +51,6 @@ static int check_pid_file(const char *fname)
 
         if (pid != 0 && pid != (int)daemon_pid)
         {
-            /* PID already written, but is it another active process? */
             if (kill(pid, 0) == 0)
             {
                 return pid;
@@ -82,7 +80,6 @@ int write_pid_file(const char *fname)
     FILE *fp;
     int rv = 0;
     daemon_pid = getpid();
-
     fp = fopen(fname, "w");
     if (fp != NULL)
     {
@@ -91,67 +88,11 @@ int write_pid_file(const char *fname)
     }
     else
     {
+        printf("Error opening file %s\n", fname);
         rv = -1;
     }
 
     return rv;
-}
-
-int wd_daemon()
-{
-    pid_t child_pid;
-    /* Become a daemon process: */
-    /* make sure we're on the root partition */
-    if (chdir("/") < 0)
-    {
-        return -1;
-    }
-
-    /* flush any stdout/stderr message before we fork */
-    fflush(stdout);
-    fflush(stderr);
-
-    /* fork to go into the background */
-    if ((child_pid = fork()) < 0)
-    {
-        return -1;
-    }
-    else if (child_pid > 0)
-    {
-        /* fork was okay          */
-        /* wait for child to exit */
-        if (waitpid(child_pid, NULL, 0) != child_pid)
-        {
-            _exit(1);
-        }
-        /* and exit myself */
-        _exit(0);
-    }
-    /* and fork again to make sure we inherit all rights from init */
-    if ((child_pid = fork()) < 0)
-    {
-        _exit(1);
-    }
-    else if (child_pid > 0)
-    {
-        // Wait for the child
-        sleep(1);
-        _exit(0);
-    }
-    /* now we're free */
-
-    /* Okay, we're a daemon     */
-    
-    // Exit tty
-    if (setsid() == -1)
-        return -1;
-
-    // Close stdin, stdout, stderr
-    close(0);
-    close(1);
-    close(2);
-    write_pid_file(saved_fname);
-    return 0;
 }
 
 void sig_handler(int sig, siginfo_t *info, void *d)
@@ -233,6 +174,12 @@ void *respond_to_client(void *usr_socket)
                 printf("Path: %s\n", path);
                 strcpy(response, path);
 
+                if (path[strlen(path) - 1] == '/')
+                {
+                    strcat(path, "index.html");
+                }
+                
+
                 filed = open(path, O_RDONLY);
                 if (filed != -1)
                 {
@@ -251,45 +198,49 @@ void *respond_to_client(void *usr_socket)
                     {
                         write(usr_sock, "Content-Type: text/html\r\n", strlen("Content-Type: text/html\r\n"));
                     }
-                    if (strcmp(ext, ".css") == 0)
+                    else if (strcmp(ext, ".css") == 0)
                     {
                         write(usr_sock, "Content-Type: text/css\r\n", strlen("Content-Type: text/css\r\n"));
                     }
-                    if (strcmp(ext, ".js") == 0)
+                    else if (strcmp(ext, ".js") == 0)
                     {
                         write(usr_sock, "Content-Type: application/javascript\r\n", strlen("Content-Type: application/javascript\r\n"));
                     }
-                    if (strcmp(ext, ".jpg") == 0)
+                    else if (strcmp(ext, ".jpg") == 0)
                     {
                         write(usr_sock, "Content-Type: image/jpeg\r\n", strlen("Content-Type: image/jpeg\r\n"));
                     }
-                    if (strcmp(ext, ".jpeg") == 0)
+                    else if (strcmp(ext, ".jpeg") == 0)
                     {
                         write(usr_sock, "Content-Type: image/jpeg\r\n", strlen("Content-Type: image/jpeg\r\n"));
                     }
-                    if (strcmp(ext, ".png") == 0)
+                    else if (strcmp(ext, ".png") == 0)
                     {
                         write(usr_sock, "Content-Type: image/png\r\n", strlen("Content-Type: image/png\r\n"));
                     }
-                    if (strcmp(ext, ".gif") == 0)
+                    else if (strcmp(ext, ".gif") == 0)
                     {
                         write(usr_sock, "Content-Type: image/gif\r\n", strlen("Content-Type: image/gif\r\n"));
                     }
-                    if (strcmp(ext, ".ico") == 0)
+                    else if (strcmp(ext, ".ico") == 0)
                     {
                         write(usr_sock, "Content-Type: image/x-icon\r\n", strlen("Content-Type: image/x-icon\r\n"));
                     }
-                    if (strcmp(ext, ".svg") == 0)
+                    else if (strcmp(ext, ".svg") == 0)
                     {
                         write(usr_sock, "Content-Type: image/svg+xml\r\n", strlen("Content-Type: image/svg+xml\r\n"));
                     }
-                    if (strcmp(ext, ".txt") == 0)
+                    else if (strcmp(ext, ".txt") == 0)
                     {
                         write(usr_sock, "Content-Type: text/plain\r\n", strlen("Content-Type: text/plain\r\n"));
                     }
-                    if (strcmp(ext, ".pdf") == 0)
+                    else if (strcmp(ext, ".pdf") == 0)
                     {
                         write(usr_sock, "Content-Type: application/pdf\r\n", strlen("Content-Type: application/pdf\r\n"));
+                    }
+                    else {
+                        write(usr_sock, "HTTP/1.1 404 Not Found\n", 23);
+                        sprintf(status, "404 Not Found");
                     }
 
                     write(usr_sock, content_length, strlen(content_length));
@@ -392,13 +343,15 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
     }
-
+    
     if (DAEMON_ENABLED) {
         if(daemon(1,0) == -1) {
             printf("Error: daemonization failed\n");
             exit(1);
         }
     }
+    
+    write_pid_file(saved_fname);
 
     sigemptyset(&iset);
     act.sa_sigaction = sig_handler;
