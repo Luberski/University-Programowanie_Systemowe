@@ -32,13 +32,13 @@ char *PORT;
 char *SERVER_CATALOG;
 int CLIENT;
 pid_t daemon_pid = 0;
-static char *saved_fname = "daemon_name.pid";
+static char *saved_dm_filename = "daemon_name.pid";
 int DAEMON_ENABLED;
 
-static int check_pid_file(const char *fname)
+static int dmfile_check(const char *dm_filename)
 {
     int pid = 0;
-    FILE *fp = fopen(fname, "r");
+    FILE *fp = fopen(dm_filename, "r");
 
     if (fp != NULL)
     {
@@ -61,13 +61,13 @@ static int check_pid_file(const char *fname)
     return 0;
 }
 
-int remove_pid_file(void)
+int dmfile_rm(void)
 {
     int rv = 0;
 
-    if (saved_fname != NULL)
+    if (saved_dm_filename != NULL)
     {
-        if (unlink(saved_fname) < 0)
+        if (unlink(saved_dm_filename) < 0)
         {
             rv = -1;
         }
@@ -75,12 +75,12 @@ int remove_pid_file(void)
     return rv;
 }
 
-int write_pid_file(const char *fname)
+int dmfile_write(const char *dm_filename)
 {
     FILE *fp;
-    int rv = 0;
+    int ret = 0;
     daemon_pid = getpid();
-    fp = fopen(fname, "w");
+    fp = fopen(dm_filename, "w");
     if (fp != NULL)
     {
         fprintf(fp, "%d\n", daemon_pid);
@@ -88,11 +88,10 @@ int write_pid_file(const char *fname)
     }
     else
     {
-        printf("Error opening file %s\n", fname);
-        rv = -1;
+        ret = -1;
     }
 
-    return rv;
+    return ret;
 }
 
 void sig_handler(int sig, siginfo_t *info, void *d)
@@ -100,7 +99,7 @@ void sig_handler(int sig, siginfo_t *info, void *d)
     if (sig == SIGINT)
     {
         close(isfd);
-        remove_pid_file();
+        dmfile_rm();
         exit(0);
     }
 }
@@ -306,7 +305,7 @@ int main(int argc, char **argv)
         switch (opt)
         {
         case 's':
-            if ((pid = check_pid_file(saved_fname)) > 0)
+            if ((pid = dmfile_check(saved_dm_filename)) > 0)
             {
                 printf("Error: server is already running with pid=%d\n", pid);
                 exit(1);
@@ -326,7 +325,7 @@ int main(int argc, char **argv)
             }
             break;
         case 'q':
-            if ((pid = check_pid_file(saved_fname)) == 0)
+            if ((pid = dmfile_check(saved_dm_filename)) == 0)
             {
                 printf("Error: server is not running\n");
                 exit(1);
@@ -351,7 +350,7 @@ int main(int argc, char **argv)
         }
     }
     
-    write_pid_file(saved_fname);
+    dmfile_write(saved_dm_filename);
 
     sigemptyset(&iset);
     act.sa_sigaction = sig_handler;
